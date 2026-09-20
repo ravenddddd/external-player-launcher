@@ -181,18 +181,27 @@ export function parseStored(
 }
 
 /**
- * The settings a platform ends up using.
+ * The settings every platform inherits, unless it has its own.
  *
- * Field by field, so a stored object that is missing one field takes that field
- * from the layer below rather than losing both it and the platform's own entry.
+ * Field by field, so a stored object missing one field takes that field from the
+ * built-in defaults rather than losing it and everything beside it.
+ */
+export function resolveDefault(stored: StoredSettings | null): PlatformSettings {
+  return { ...BUILT_IN_DEFAULTS, ...dropUndefined(stored?.default) };
+}
+
+/**
+ * The settings a platform ends up using — the default's, with its own over the top.
+ *
+ * Field by field, so a platform that changed one setting keeps the default's
+ * answer for the others rather than losing the lot.
  */
 export function resolveSettings(
   stored: StoredSettings | null,
   platform: PlatformKey
 ): PlatformSettings {
   return {
-    ...BUILT_IN_DEFAULTS,
-    ...dropUndefined(stored?.default),
+    ...resolveDefault(stored),
     ...dropUndefined(stored?.platforms?.[platform]),
   };
 }

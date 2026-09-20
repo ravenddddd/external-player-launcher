@@ -59,6 +59,12 @@
     }
   }
 
+  // The platform list: as wide as its longest entry needs, not the whole dialog
+  .ep-platform-select {
+    width: auto;
+    max-width: 100%;
+  }
+
   .ep-list {
     display: grid;
     gap: 0.25rem;

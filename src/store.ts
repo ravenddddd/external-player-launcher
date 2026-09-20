@@ -22,6 +22,7 @@
 import {
   parseSettings,
   platformKey,
+  resolveDefault,
   resolveSettings,
   withDefaultSettings,
   withPlatformSettings,
@@ -150,6 +151,11 @@ export function currentPlatform(): PlatformKey {
 /** The settings a platform is using — synchronously, from memory */
 export function read(target: PlatformKey = currentPlatform()): PlatformSettings {
   return resolveSettings(cache, target);
+}
+
+/** The settings every platform inherits, unless it has its own */
+export function readDefault(): PlatformSettings {
+  return resolveDefault(cache);
 }
 
 /** What Stash was last seen to hold: which platforms have settings of their own */

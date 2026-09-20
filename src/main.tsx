@@ -1,9 +1,14 @@
+import { PLATFORM_KEYS, hasOverride } from "./settings";
+import type { PlatformKey } from "./settings";
 import {
   PLUGIN_ID,
   currentPlatform,
   load as loadSettings,
   read as readStoredSettings,
+  readDefault as readStoredDefaults,
   save as saveStoredSettings,
+  saveDefault as saveStoredDefaults,
+  stored as storedSettings,
   subscribe,
 } from "./store";
 
@@ -138,15 +143,17 @@ declare const __PLUGIN_VERSION__: string;
   }
 
   /**
-   * The settings, answered from memory rather than over the network.
+   * The settings for one of the panel's entries, answered from memory.
    *
    * Corrected against the players this version of the plugin has on the way out: a
    * stored object can name one that has since been removed, or exclude all of them,
    * and neither is a state the button lists can draw.
    */
-  function readSettings(): SettingsState {
+  function readSettingsFor(target: PlatformKey | "default"): SettingsState {
+    const stored =
+      target === "default" ? readStoredDefaults() : readStoredSettings(target);
     const validIds = playerButtons.map((button) => button.id);
-    const settings: SettingsState = { ...readStoredSettings() };
+    const settings: SettingsState = { ...stored };
 
     if (!validIds.includes(settings.singlePlayerId)) {
       settings.singlePlayerId = defaultSettings.singlePlayerId;
@@ -162,9 +169,15 @@ declare const __PLUGIN_VERSION__: string;
     return settings;
   }
 
-  /** Saves the settings for the platform in use, resolving once Stash has them */
-  function saveSettings(nextSettings: SettingsState): Promise<void> {
-    return saveStoredSettings(nextSettings, currentPlatform());
+  /**
+   * The settings this browser should use.
+   *
+   * Named and shaped as it always was, because the parts of this plugin that are
+   * not React — the patch callbacks that put the tab and the toolbar buttons on a
+   * scene page — read it that way and have no way to wait for an answer.
+   */
+  function readSettings(): SettingsState {
+    return readSettingsFor(currentPlatform());
   }
 
   /**
@@ -503,6 +516,28 @@ declare const __PLUGIN_VERSION__: string;
   }
 
   /** Thin wrapper: provides IntlProvider context for SettingsModalInner */
+  /**
+   * A platform's name as the panel lists it.
+   *
+   * The five are written as their makers write them, so they are not translated —
+   * "Windows" is Windows in every language this plugin ships. Only "other" is a
+   * word rather than a name, so only that one is a message.
+   */
+  function platformName(
+    intl: { formatMessage: (descriptor: { id: string }) => string },
+    key: PlatformKey
+  ): string {
+    if (key === "other") return intl.formatMessage({ id: "settings.platform.other" });
+
+    return {
+      windows: "Windows",
+      macos: "macOS",
+      ios: "iOS",
+      android: "Android",
+      linux: "Linux",
+    }[key];
+  }
+
   function SettingsModal({ refreshOnSave }: { refreshOnSave?: boolean }) {
     return (
       <PluginIntlProvider>
@@ -515,21 +550,50 @@ declare const __PLUGIN_VERSION__: string;
     const intl = Intl.useIntl();
     const [show, setShow] = React.useState(false);
     const { settings } = useSettingsState();
+
+    /**
+     * What the panel is editing: the settings every platform inherits, or one
+     * platform's own.
+     *
+     * The default is the base and is always editable, so the panel opens on it:
+     * "change this everywhere" is what somebody reaches for most, and a platform's
+     * own settings are the exception that is asked for. The platform in use is
+     * marked in the list, so switching to it takes no thinking.
+     */
+    const [target, setTarget] = React.useState<PlatformKey | "default">("default");
+    /** Whether the selected platform has settings of its own, rather than inheriting */
+    const [own, setOwn] = React.useState(false);
     const [draftSettings, setDraftSettings] = React.useState<SettingsState>(() => cloneSettings(settings));
+
+    /** Whether the settings below belong to the selected entry and can be edited */
+    const editable = target === "default" || own;
+    /** The other side of that: a platform using the default's settings instead */
+    const inheriting = !editable;
+
+    /** Points the panel at one of the entries, draft and all */
+    const selectTarget = (next: PlatformKey | "default") => {
+      setTarget(next);
+      setOwn(next !== "default" && hasOverride(storedSettings(), next));
+      setDraftSettings(cloneSettings(readSettingsFor(next)));
+    };
 
     React.useEffect(() => {
       if (!show) {
-        setDraftSettings(cloneSettings(settings));
+        // Closed: back to where it opens, so the next opening starts from Stash's
+        // settings rather than from whatever was left in the draft.
+        setTarget("default");
+        setOwn(false);
+        setDraftSettings(cloneSettings(readSettingsFor("default")));
       }
     }, [settings, show]);
 
     const openModal = () => {
-      setDraftSettings(cloneSettings(settings));
+      selectTarget("default");
       setShow(true);
     };
 
     const closeModal = () => {
-      setDraftSettings(cloneSettings(settings));
+      selectTarget("default");
       setShow(false);
     };
 
@@ -556,11 +620,26 @@ declare const __PLUGIN_VERSION__: string;
       });
     };
 
+    /**
+     * Writes what the panel is showing, to wherever it belongs.
+     *
+     * Three cases, and the third is the one worth reading twice: confirming a
+     * platform that is *inheriting* saves nothing for it — it writes away any
+     * settings the platform had, which is what the switch being off means. Turning
+     * that switch off and confirming is how a platform goes back to the default.
+     */
     const confirmSettings = () => {
+      const writing =
+        target === "default"
+          ? saveDefaultSettings(draftSettings)
+          : own
+            ? saveStoredSettings(draftSettings, target)
+            : saveStoredSettings(null, target);
+
       // Waited for, and the reload in particular: reloading a page aborts whatever
       // it still has in flight, so closing up straight after asking Stash to save
       // is how a save goes missing.
-      saveSettings(draftSettings).then(
+      writing.then(
         () => {
           setShow(false);
           if (refreshOnSave) {
@@ -607,6 +686,70 @@ declare const __PLUGIN_VERSION__: string;
               <FormattedMessage id="settings.noteText" />
             </div>
 
+            {/*
+              Which settings are being edited. The default is the base every
+              platform inherits; a platform's own settings are the exception, and
+              the switch inside is how one is asked for — and how it is given back.
+            */}
+            <div className="ep-section">
+              <div className="ep-heading">
+                <FormattedMessage id="settings.platform.title" />
+              </div>
+
+              <div className="ep-options">
+                <Form.Control
+                  as="select"
+                  className="ep-platform-select"
+                  value={target}
+                  onChange={(event: React.ChangeEvent<HTMLSelectElement>) =>
+                    selectTarget(event.target.value as PlatformKey | "default")
+                  }
+                >
+                  <option value="default">
+                    {intl.formatMessage({ id: 'settings.platform.default' })}
+                  </option>
+                  {PLATFORM_KEYS.map((key) => (
+                    <option key={key} value={key}>
+                      {platformName(intl, key)}
+                      {key === currentPlatform()
+                        ? ` — ${intl.formatMessage({ id: 'settings.platform.current' })}`
+                        : ""}
+                    </option>
+                  ))}
+                </Form.Control>
+                <div className="ep-hint">
+                  <FormattedMessage id="settings.platform.hint" />
+                </div>
+              </div>
+
+              {target !== "default" ? (
+                <div className="ep-options">
+                  <Form.Check
+                    type="switch"
+                    id="external-player-platform-own"
+                    label={intl.formatMessage({ id: 'settings.platform.own' })}
+                    checked={own}
+                    onChange={(event: React.ChangeEvent<HTMLInputElement>) => {
+                      const next = event.target.checked;
+                      setOwn(next);
+                      // Off means "use the default": the draft goes back to it, so
+                      // what the panel shows is what the platform would actually use.
+                      if (!next) setDraftSettings(cloneSettings(readSettingsFor("default")));
+                    }}
+                  />
+                  <div className="ep-hint">
+                    <FormattedMessage id="settings.platform.ownHint" />
+                  </div>
+                </div>
+              ) : null}
+
+              {inheriting ? (
+                <div className="ep-hint">
+                  <FormattedMessage id="settings.platform.inherited" />
+                </div>
+              ) : null}
+            </div>
+
             <div className="ep-section">
               <div className="ep-heading">
                 <FormattedMessage id="settings.entryGroupTitle" />
@@ -617,6 +760,7 @@ declare const __PLUGIN_VERSION__: string;
                   type="switch"
                   id="external-player-show-card-buttons"
                   label={intl.formatMessage({ id: 'settings.showSceneCardButtons' })}
+                  disabled={inheriting}
                   checked={draftSettings.showSceneCardButtons}
                   onChange={(event: React.ChangeEvent<HTMLInputElement>) =>
                     setDraftSettings((current) => ({
@@ -635,6 +779,7 @@ declare const __PLUGIN_VERSION__: string;
                   type="switch"
                   id="external-player-show-detail-buttons"
                   label={intl.formatMessage({ id: 'settings.showSceneDetailButtons' })}
+                  disabled={inheriting}
                   checked={draftSettings.showSceneDetailButtons}
                   onChange={(event: React.ChangeEvent<HTMLInputElement>) =>
                     setDraftSettings((current) => ({
@@ -653,6 +798,7 @@ declare const __PLUGIN_VERSION__: string;
                   type="switch"
                   id="external-player-show-toolbar-buttons"
                   label={intl.formatMessage({ id: 'settings.showSceneToolbarButtons' })}
+                  disabled={inheriting}
                   checked={draftSettings.showSceneToolbarButtons}
                   onChange={(event: React.ChangeEvent<HTMLInputElement>) =>
                     setDraftSettings((current) => ({
@@ -677,6 +823,7 @@ declare const __PLUGIN_VERSION__: string;
                   type="switch"
                   id="external-player-single-mode"
                   label={intl.formatMessage({ id: 'settings.singlePlayerMode' })}
+                  disabled={inheriting}
                   checked={draftSettings.singlePlayerMode}
                   onChange={(event: React.ChangeEvent<HTMLInputElement>) =>
                     setDraftSettings((current) => ({
@@ -710,6 +857,7 @@ declare const __PLUGIN_VERSION__: string;
                         id={`external-player-${button.id}`}
                         name="external-player-selection"
                         className="ep-item"
+                        disabled={inheriting}
                         checked={checked}
                         onChange={() => togglePlayer(button.id)}
                         label={
@@ -730,7 +878,13 @@ declare const __PLUGIN_VERSION__: string;
             </div>
 
             <div className="ep-section">
-              <Button variant="danger" onClick={resetDraftSettings}>
+              {/* Nothing to reset while a platform is inheriting: the draft is the
+                  default's, and confirming writes it away rather than saving it. */}
+              <Button
+                variant="danger"
+                disabled={inheriting}
+                onClick={resetDraftSettings}
+              >
                 <FormattedMessage id="settings.reset" />
               </Button>
             </div>
