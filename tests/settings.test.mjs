@@ -14,6 +14,7 @@ import { describe, it } from "node:test";
 
 import {
   BUILT_IN_DEFAULTS,
+  PLATFORM_CHOICES,
   PLATFORM_KEYS,
   hasOverride,
   parseSettings,
@@ -232,5 +233,26 @@ describe("changing what is stored", () => {
       "linux",
       "other",
     ]);
+  });
+
+  it("offers every platform it can store, and no more", () => {
+    // Two lists on purpose — the panel's entries and the keys a value can be
+    // stored under — and this is the invariant that keeps them from drifting:
+    // anything offered must be storable, and the only thing storable that is not
+    // offered is "other", which is a browser nobody can say anything about.
+    const offered = new Set(PLATFORM_CHOICES);
+
+    assert.equal(offered.size, PLATFORM_CHOICES.length, "no duplicates");
+    assert.deepEqual(
+      PLATFORM_KEYS.filter((key) => !offered.has(key)),
+      ["other"],
+      "the only platform not offered is the one nothing can be said about"
+    );
+    assert.equal(
+      PLATFORM_CHOICES.includes("other"),
+      false,
+      "and it is not offered: there is nothing to configure for a browser " +
+        "nobody can identify"
+    );
   });
 });

@@ -5,7 +5,6 @@
   "settings.noteText": "設定儲存在 Stash 裡，換瀏覽器、換裝置都會跟著走 —— 包括無痕視窗。",
   "settings.platform.title": "平台",
   "settings.platform.default": "預設（所有平台）",
-  "settings.platform.other": "其它",
   "settings.platform.current": "目前",
   "settings.platform.hint": "預設對所有平台生效；某個平台如果單獨設定了，就用它自己那份。",
   "settings.platform.own": "這個平台使用獨立的設定",

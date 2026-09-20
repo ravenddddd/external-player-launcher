@@ -5,7 +5,6 @@
   "settings.noteText": "Settings are saved in Stash, so they follow you to every browser and device — including a private window.",
   "settings.platform.title": "Platform",
   "settings.platform.default": "Default (all platforms)",
-  "settings.platform.other": "Other",
   "settings.platform.current": "current",
   "settings.platform.hint": "The default applies everywhere. A platform with settings of its own uses those instead.",
   "settings.platform.own": "Use settings for this platform",

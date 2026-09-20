@@ -59,9 +59,10 @@
     }
   }
 
-  // The platform list: as wide as its longest entry needs, not the whole dialog
+  // The platform list: a column of its own rather than the whole dialog. The
+  // element is react-select's wrapper, which has no width of its own.
   .ep-platform-select {
-    width: auto;
+    width: 18rem;
     max-width: 100%;
   }
 

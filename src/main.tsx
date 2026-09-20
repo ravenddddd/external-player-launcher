@@ -1,4 +1,4 @@
-import { PLATFORM_KEYS, hasOverride } from "./settings";
+import { PLATFORM_CHOICES, hasOverride } from "./settings";
 import type { PlatformKey } from "./settings";
 import {
   PLUGIN_ID,
@@ -17,14 +17,19 @@ declare const __PLUGIN_VERSION__: string;
 (function () {
   const { PluginApi } = window;
   const { React, ReactDOM } = PluginApi;
-  const { Bootstrap, FontAwesomeSolid, Intl } = PluginApi.libraries;
-  const { Nav, Tab, Button, ButtonGroup, Dropdown, Modal, 
+  const { Bootstrap, FontAwesomeSolid, FontAwesomeBrands, Intl, ReactSelect } =
+    PluginApi.libraries;
+  const { Nav, Tab, Button, ButtonGroup, Dropdown, Modal,
     Form, OverlayTrigger, Tooltip
   } = Bootstrap;
   const { Icon, } = PluginApi.components;
   const { faGear } = FontAwesomeSolid;
   const { useConfiguration } = PluginApi.utils.StashService;
   const { IntlProvider, FormattedMessage } = Intl;
+
+  // Stash's own dropdown, the one its own selectors are made of. The tag is a
+  // module, so the component is whichever name it exports as its default.
+  const Select = ReactSelect.default || ReactSelect.Select;
 
   // Plugin version, injected at build time
   const PLUGIN_VERSION = __PLUGIN_VERSION__;
@@ -519,23 +524,100 @@ declare const __PLUGIN_VERSION__: string;
   /**
    * A platform's name as the panel lists it.
    *
-   * The five are written as their makers write them, so they are not translated —
-   * "Windows" is Windows in every language this plugin ships. Only "other" is a
-   * word rather than a name, so only that one is a message.
+   * Written as its maker writes it, so it is not translated — "Windows" is
+   * Windows in every language this plugin ships.
    */
-  function platformName(
-    intl: { formatMessage: (descriptor: { id: string }) => string },
-    key: PlatformKey
-  ): string {
-    if (key === "other") return intl.formatMessage({ id: "settings.platform.other" });
-
+  function platformName(key: PlatformKey): string {
     return {
       windows: "Windows",
       macos: "macOS",
       ios: "iOS",
       android: "Android",
       linux: "Linux",
+      other: "Other",
     }[key];
+  }
+
+  /**
+   * A platform's icon, or undefined for one this Stash has no picture for.
+   *
+   * Brands rather than solid glyphs, because these are the logos their owners
+   * draw and Stash's own UI uses the same set for the same reason. The one
+   * exception is iOS: the Apple logo is already macOS's, and a phone says "phone"
+   * better than a second Apple would.
+   *
+   * Undefined rather than a guess, and the caller draws nothing: a name the
+   * running Stash's FontAwesome does not have comes back undefined, and an
+   * undefined icon handed to Stash's Icon *throws inside a render* — which takes
+   * the page down rather than leaving one glyph out.
+   */
+  function platformIcon(key: PlatformKey): unknown {
+    const Brands = PluginApi.libraries.FontAwesomeBrands || {};
+    const Solid = PluginApi.libraries.FontAwesomeSolid || {};
+
+    switch (key) {
+      case "windows":
+        return Brands.faWindows;
+      case "macos":
+        return Brands.faApple;
+      case "ios":
+        return Solid.faMobileScreen;
+      case "android":
+        return Brands.faAndroid;
+      case "linux":
+        return Brands.faLinux;
+      default:
+        // "All platforms", which is the default entry rather than a platform
+        return Solid.faGlobe;
+    }
+  }
+
+  /**
+   * One entry in the platform dropdown.
+   *
+   * The label is built here rather than looked up by the renderer, because
+   * react-select calls `formatOptionLabel` while it renders and a component's
+   * worth of hooks cannot be used in something invoked per option — so the
+   * translated words have to already be in the option by the time it gets there.
+   */
+  interface PlatformOption {
+    value: PlatformKey | "default";
+    label: string;
+    icon: unknown;
+  }
+
+  function platformOptions(intl: {
+    formatMessage: (descriptor: { id: string }) => string;
+  }): PlatformOption[] {
+    const current = currentPlatform();
+
+    return [
+      {
+        value: "default",
+        label: intl.formatMessage({ id: "settings.platform.default" }),
+        icon: platformIcon("default"),
+      },
+    ].concat(
+      PLATFORM_CHOICES.map((key) => ({
+        value: key,
+        label:
+          platformName(key) +
+          (key === current
+            ? ` (${intl.formatMessage({ id: "settings.platform.current" })})`
+            : ""),
+        icon: platformIcon(key),
+      }))
+    );
+  }
+
+  /** Draws one platform option: its icon, then its name */
+  function formatPlatformOption(option: PlatformOption) {
+    return (
+      <span className="ep-label">
+        {option.icon ? <Icon icon={option.icon} fixedWidth /> : null}
+        <span>{option.label}</span>
+      </span>
+    );
   }
 
   function SettingsModal({ refreshOnSave }: { refreshOnSave?: boolean }) {
@@ -569,6 +651,12 @@ declare const __PLUGIN_VERSION__: string;
     const editable = target === "default" || own;
     /** The other side of that: a platform using the default's settings instead */
     const inheriting = !editable;
+
+    /** The platforms, and which of them is selected — built once per render */
+    const platformOptionsForPanel = platformOptions(intl);
+    const platformChoice = platformOptionsForPanel.find(
+      (option) => option.value === target
+    );
 
     /** Points the panel at one of the entries, draft and all */
     const selectTarget = (next: PlatformKey | "default") => {
@@ -697,26 +785,31 @@ declare const __PLUGIN_VERSION__: string;
               </div>
 
               <div className="ep-options">
-                <Form.Control
-                  as="select"
+                {/*
+                  Stash's own dropdown — react-select, which is what every other
+                  selector in this application is — so this one sits in the panel
+                  looking like it was always there. Its separator indicator is
+                  stripped for the same reason Stash strips it from its own.
+
+                  The dialog is narrow, so the menu is portalled to the body: a
+                  menu inside an `overflow: auto` body is a menu that can be cut
+                  off partway down.
+                */}
+                <Select
                   className="ep-platform-select"
-                  value={target}
-                  onChange={(event: React.ChangeEvent<HTMLSelectElement>) =>
-                    selectTarget(event.target.value as PlatformKey | "default")
+                  classNamePrefix="react-select"
+                  inputId="external-player-platform"
+                  isSearchable={false}
+                  isClearable={false}
+                  components={{ IndicatorSeparator: () => null }}
+                  menuPortalTarget={document.body}
+                  value={platformChoice}
+                  options={platformOptionsForPanel}
+                  formatOptionLabel={formatPlatformOption}
+                  onChange={(option: { value: string } | null) =>
+                    selectTarget((option?.value || "default") as PlatformKey | "default")
                   }
-                >
-                  <option value="default">
-                    {intl.formatMessage({ id: 'settings.platform.default' })}
-                  </option>
-                  {PLATFORM_KEYS.map((key) => (
-                    <option key={key} value={key}>
-                      {platformName(intl, key)}
-                      {key === currentPlatform()
-                        ? ` — ${intl.formatMessage({ id: 'settings.platform.current' })}`
-                        : ""}
-                    </option>
-                  ))}
-                </Form.Control>
+                />
                 <div className="ep-hint">
                   <FormattedMessage id="settings.platform.hint" />
                 </div>

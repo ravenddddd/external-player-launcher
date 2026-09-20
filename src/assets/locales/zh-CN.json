@@ -5,7 +5,6 @@
   "settings.noteText": "设置保存在 Stash 里，换浏览器、换设备都会跟着走 —— 包括无痕窗口。",
   "settings.platform.title": "平台",
   "settings.platform.default": "默认（所有平台）",
-  "settings.platform.other": "其它",
   "settings.platform.current": "当前",
   "settings.platform.hint": "默认对所有平台生效；某个平台如果单独设置了，就用它自己那份。",
   "settings.platform.own": "这个平台使用单独的设置",

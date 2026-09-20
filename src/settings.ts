@@ -65,6 +65,24 @@ export const PLATFORM_KEYS: PlatformKey[] = [
 ];
 
 /**
+ * The platforms the panel offers, which is every one but `other`.
+ *
+ * `other` is what an unrecognised browser is, and it is a real answer — its
+ * settings resolve to the default like anything else — but there is nothing to
+ * configure for it: nobody knows which browser it is, so nobody can say what it
+ * should do differently. It stays in `PLATFORM_KEYS`, because a stored value is
+ * read by that list, and offering a platform that could never be stored (or
+ * storing one that could never be offered) is the mistake this split avoids.
+ */
+export const PLATFORM_CHOICES: PlatformKey[] = [
+  "windows",
+  "macos",
+  "ios",
+  "android",
+  "linux",
+];
+
+/**
  * Which platform a browser is.
  *
  * The user-agent tests are the ones the plugin already used to build its links, in
