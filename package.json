@@ -12,7 +12,7 @@
     "build:dev": "node build.mjs --dev",
     "deploy": "pnpm build:dev && node deploy.mjs",
     "release": "pnpm build && node release.mjs",
-    "test": "node --test"
+    "test": "tsc --noEmit && node --test"
   },
   "peerDependencies": {
     "@apollo/client": "^3.13.4",

@@ -28,8 +28,8 @@ declare const __PLUGIN_VERSION__: string;
   const { IntlProvider, FormattedMessage } = Intl;
 
   // Stash's own dropdown, the one its own selectors are made of. The tag is a
-  // module, so the component is whichever name it exports as its default.
-  const Select = ReactSelect.default || ReactSelect.Select;
+  // module, and the component is what it exports as its default.
+  const Select = ReactSelect.default;
 
   // Plugin version, injected at build time
   const PLUGIN_VERSION = __PLUGIN_VERSION__;
@@ -552,7 +552,7 @@ declare const __PLUGIN_VERSION__: string;
    * undefined icon handed to Stash's Icon *throws inside a render* — which takes
    * the page down rather than leaving one glyph out.
    */
-  function platformIcon(key: PlatformKey): unknown {
+  function platformIcon(key: PlatformKey | "default"): unknown {
     const Brands = PluginApi.libraries.FontAwesomeBrands || {};
     const Solid = PluginApi.libraries.FontAwesomeSolid || {};
 
@@ -591,22 +591,26 @@ declare const __PLUGIN_VERSION__: string;
   }): PlatformOption[] {
     const current = currentPlatform();
 
-    return [
+    const entries: PlatformOption[] = [
       {
         value: "default",
         label: intl.formatMessage({ id: "settings.platform.default" }),
         icon: platformIcon("default"),
       },
-    ].concat(
-      PLATFORM_CHOICES.map((key) => ({
-        value: key,
-        label:
-          platformName(key) +
-          (key === current
-            ? ` (${intl.formatMessage({ id: "settings.platform.current" })})`
-            : ""),
-        icon: platformIcon(key),
-      }))
+    ];
+
+    return entries.concat(
+      PLATFORM_CHOICES.map(
+        (key): PlatformOption => ({
+          value: key,
+          label:
+            platformName(key) +
+            (key === current
+              ? ` (${intl.formatMessage({ id: "settings.platform.current" })})`
+              : ""),
+          icon: platformIcon(key),
+        })
+      )
     );
   }
 
@@ -725,7 +729,7 @@ declare const __PLUGIN_VERSION__: string;
     const confirmSettings = () => {
       const writing =
         target === "default"
-          ? saveDefaultSettings(draftSettings)
+          ? saveStoredDefaults(draftSettings)
           : own
             ? saveStoredSettings(draftSettings, target)
             : saveStoredSettings(null, target);
