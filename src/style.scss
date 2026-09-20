@@ -72,11 +72,11 @@
   // The icon and the name inside a platform option, or inside the box when one is
   // chosen. No left margin: an option starts at the edge of its menu, and the
   // player list's `ep-label` cannot be reused for it because that one is holding
-  // itself away from a checkbox.
+  // itself away from a checkbox. No gap either — the icon is drawn at a fixed
+  // width, which is its own space.
   .ep-platform-option {
     display: inline-flex;
     align-items: center;
-    gap: 0.5rem;
   }
 
   .ep-list {
