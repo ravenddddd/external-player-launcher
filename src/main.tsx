@@ -1,3 +1,12 @@
+import {
+  PLUGIN_ID,
+  currentPlatform,
+  load as loadSettings,
+  read as readStoredSettings,
+  save as saveStoredSettings,
+  subscribe,
+} from "./store";
+
 declare const __PLUGIN_VERSION__: string;
 
 (function () {
@@ -15,10 +24,17 @@ declare const __PLUGIN_VERSION__: string;
   // Plugin version, injected at build time
   const PLUGIN_VERSION = __PLUGIN_VERSION__;
 
-  const pluginID = 'external-player-launcher';
+  // The ID comes from store.ts, which needs it as the key the settings live under
+  // in Stash's configuration: one spelling, in one place.
+  const pluginID = PLUGIN_ID;
   const iconsPath = "./plugin/external-player-launcher/assets/icons";
   const localesBase = `./plugin/external-player-launcher/assets/locales`;
-  const storageKey = `${pluginID}.settings`;
+
+  // Asked for once, as early as the plugin can ask. Everything that draws a button
+  // reads the settings, and until Stash answers they are the built-in defaults —
+  // they are kept in Stash rather than in this browser, for the reasons store.ts
+  // gives.
+  void loadSettings();
 
   const playerButtons = [
     { id: "iina", name: "IINA", onClick: openIINA },
@@ -101,6 +117,13 @@ declare const __PLUGIN_VERSION__: string;
     showSceneToolbarButtons: boolean;
   }
 
+  /**
+   * What the Reset button goes back to.
+   *
+   * Built from the players this version of the plugin has, rather than taken from
+   * the store's built-in defaults, so resetting always lands on a settings object
+   * that names a player that exists.
+   */
   const defaultSettings: SettingsState = {
     excludedPlayerIds: [],
     singlePlayerId: playerButtons[0].id,
@@ -114,47 +137,47 @@ declare const __PLUGIN_VERSION__: string;
     return { ...settings };
   }
 
+  /**
+   * The settings, answered from memory rather than over the network.
+   *
+   * Corrected against the players this version of the plugin has on the way out: a
+   * stored object can name one that has since been removed, or exclude all of them,
+   * and neither is a state the button lists can draw.
+   */
   function readSettings(): SettingsState {
     const validIds = playerButtons.map((button) => button.id);
+    const settings: SettingsState = { ...readStoredSettings() };
 
-    try {
-      const raw = localStorage.getItem(storageKey);
-      if (!raw) return { ...defaultSettings };
-
-      const stored = JSON.parse(raw);
-      // Two-tier fallback: localStorage -> defaultSettings
-      const merged: SettingsState = { ...defaultSettings, ...stored };
-
-      if (Array.isArray(merged.excludedPlayerIds)) {
-        merged.excludedPlayerIds = merged.excludedPlayerIds.filter((id) => validIds.includes(id));
-      }
-      if (!validIds.includes(merged.singlePlayerId)) {
-        merged.singlePlayerId = defaultSettings.singlePlayerId;
-      }
-
-      return merged;
-    } catch {
-      return { ...defaultSettings };
+    if (!validIds.includes(settings.singlePlayerId)) {
+      settings.singlePlayerId = defaultSettings.singlePlayerId;
     }
+
+    settings.excludedPlayerIds = settings.excludedPlayerIds.filter((id) =>
+      validIds.includes(id)
+    );
+    if (settings.excludedPlayerIds.length >= validIds.length) {
+      settings.excludedPlayerIds = [];
+    }
+
+    return settings;
   }
 
-  function saveSettings(nextSettings: SettingsState) {
-    localStorage.setItem(storageKey, JSON.stringify(nextSettings));
-    window.dispatchEvent(new CustomEvent("external-player-launcher-settings-change", { detail: nextSettings }));
+  /** Saves the settings for the platform in use, resolving once Stash has them */
+  function saveSettings(nextSettings: SettingsState): Promise<void> {
+    return saveStoredSettings(nextSettings, currentPlatform());
   }
 
+  /**
+   * The settings, and a re-render whenever they change.
+   *
+   * Subscribed rather than read once: a save has to reach what is on screen, and
+   * with the settings in Stash rather than in this browser there is no `storage`
+   * event to lean on for it.
+   */
   function useSettingsState() {
     const [settings, setSettings] = React.useState<SettingsState>(() => readSettings());
 
-    React.useEffect(() => {
-      const syncSettings = () => setSettings(readSettings());
-      window.addEventListener("storage", syncSettings);
-      window.addEventListener("external-player-launcher-settings-change", syncSettings as EventListener);
-      return () => {
-        window.removeEventListener("storage", syncSettings);
-        window.removeEventListener("external-player-launcher-settings-change", syncSettings as EventListener);
-      };
-    }, []);
+    React.useEffect(() => subscribe(() => setSettings(readSettings())), []);
 
     return { settings };
   }
@@ -534,11 +557,21 @@ declare const __PLUGIN_VERSION__: string;
     };
 
     const confirmSettings = () => {
-      saveSettings(draftSettings);
-      setShow(false);
-      if (refreshOnSave) {
-        window.location.reload();
-      }
+      // Waited for, and the reload in particular: reloading a page aborts whatever
+      // it still has in flight, so closing up straight after asking Stash to save
+      // is how a save goes missing.
+      saveSettings(draftSettings).then(
+        () => {
+          setShow(false);
+          if (refreshOnSave) {
+            window.location.reload();
+          }
+        },
+        () => {
+          // The store has reported it. The panel stays open holding the reader's
+          // changes, which is now the only place they exist.
+        }
+      );
     };
 
     const resetDraftSettings = () => {
@@ -570,7 +603,7 @@ declare const __PLUGIN_VERSION__: string;
           </Modal.Header>
           <Modal.Body>
             <div className="ep-note-block">
-              ⚠️<strong><FormattedMessage id="settings.noteBold" /></strong>
+              <strong><FormattedMessage id="settings.noteBold" /></strong>
               <FormattedMessage id="settings.noteText" />
             </div>
 

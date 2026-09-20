@@ -126,29 +126,27 @@ function readSettingsValue(value: unknown): Partial<PlatformSettings> {
 }
 
 /**
- * Reads what is in storage, or null when there is nothing usable in it.
+ * Reads a stored value, or null when there is nothing usable in it.
  *
  * Null means "this browser has never been configured", which is a different thing
  * from a settings object that happens to be empty. Anything unrecognised — another
  * plugin's value under our key, half-written JSON, or the shape an older version of
  * this plugin wrote — is null: there is no migration, and a value that cannot be
  * read is ignored rather than guessed at.
+ *
+ * Takes the value rather than text, because the two places it comes from differ:
+ * Stash's configuration hands back an object, and the cache in front of it holds
+ * text. `parseStored` is the text one; this is the rule both obey.
  */
-export function parseStored(raw: string | null | undefined): StoredSettings | null {
-  if (!raw) return null;
+export function parseSettings(value: unknown): StoredSettings | null {
+  if (!value || typeof value !== "object" || Array.isArray(value)) return null;
 
-  let parsed: unknown;
-  try {
-    parsed = JSON.parse(raw);
-  } catch {
-    return null;
-  }
+  const record = value as Record<string, unknown>;
+  if (record.version !== 2) return null;
 
-  const value = parsed as Record<string, unknown> | null;
-  if (!value || typeof value !== "object" || value.version !== 2) return null;
 
   const platforms: StoredSettings["platforms"] = {};
-  const stored = value.platforms;
+  const stored = record.platforms;
   if (stored && typeof stored === "object" && !Array.isArray(stored)) {
     for (const key of PLATFORM_KEYS) {
       const entry = (stored as Record<string, unknown>)[key];
@@ -164,9 +162,22 @@ export function parseStored(raw: string | null | undefined): StoredSettings | nu
 
   return {
     version: 2,
-    default: dropUndefined(readSettingsValue(value.default)),
+    default: dropUndefined(readSettingsValue(record.default)),
     platforms,
   };
+}
+
+/** The same rule, for a value that arrived as text */
+export function parseStored(
+  raw: string | null | undefined
+): StoredSettings | null {
+  if (!raw) return null;
+
+  try {
+    return parseSettings(JSON.parse(raw));
+  } catch {
+    return null;
+  }
 }
 
 /**

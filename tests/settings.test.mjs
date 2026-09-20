@@ -16,6 +16,7 @@ import {
   BUILT_IN_DEFAULTS,
   PLATFORM_KEYS,
   hasOverride,
+  parseSettings,
   parseStored,
   platformKey,
   resolveSettings,
@@ -123,6 +124,24 @@ describe("what is in storage", () => {
 
     assert.deepEqual(stored.platforms, {});
     assert.equal(hasOverride(stored, "android"), false);
+  });
+
+  it("applies the same rule to an object, which is what Stash answers with", () => {
+    // The server hands back an object and a cache holds text; one rule covers both,
+    // so both are tested. An empty configuration is a value — not the same thing as
+    // nothing at all, though they come to the same settings.
+    assert.deepEqual(
+      parseSettings({ version: 2, default: { singlePlayerId: "vlc" }, platforms: {} }),
+      { version: 2, default: { singlePlayerId: "vlc" }, platforms: {} }
+    );
+    assert.deepEqual(parseSettings({ version: 2 }), {
+      version: 2,
+      default: {},
+      platforms: {},
+    });
+    assert.equal(parseSettings(null), null);
+    assert.equal(parseSettings("a string"), null);
+    assert.equal(parseSettings([]), null);
   });
 });
 

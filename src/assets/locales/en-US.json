@@ -2,7 +2,7 @@
   "settings.openButton": "Settings",
   "settings.modal.title": "External Player Settings",
   "settings.noteBold": "Note: ",
-  "settings.noteText": "All settings only affect this browser.",
+  "settings.noteText": "Settings are saved in Stash, so they follow you to every browser and device — including a private window.",
   "settings.entryGroupTitle": "Display Locations",
   "settings.showSceneCardButtons": "Show player buttons on scene cards",
   "settings.showSceneCardButtonsHint": "When disabled, player buttons are hidden on scene cards.",

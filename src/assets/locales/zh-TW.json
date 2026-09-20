@@ -2,7 +2,7 @@
   "settings.openButton": "設定",
   "settings.modal.title": "外部播放器設定",
   "settings.noteBold": "注意：",
-  "settings.noteText": "所有設定僅對目前瀏覽器生效。",
+  "settings.noteText": "設定儲存在 Stash 裡，換瀏覽器、換裝置都會跟著走 —— 包括無痕視窗。",
   "settings.entryGroupTitle": "顯示位置",
   "settings.showSceneCardButtons": "顯示短片卡片播放器按鈕",
   "settings.showSceneCardButtonsHint": "關閉後，短片卡片上將不再顯示播放器按鈕。",
