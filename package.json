@@ -11,7 +11,8 @@
     "build": "node build.mjs",
     "build:dev": "node build.mjs --dev",
     "deploy": "pnpm build:dev && node deploy.mjs",
-    "release": "pnpm build && node release.mjs"
+    "release": "pnpm build && node release.mjs",
+    "test": "node --test"
   },
   "peerDependencies": {
     "@apollo/client": "^3.13.4",
