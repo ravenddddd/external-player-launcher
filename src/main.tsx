@@ -542,9 +542,10 @@ declare const __PLUGIN_VERSION__: string;
    * A platform's icon, or undefined for one this Stash has no picture for.
    *
    * Brands rather than solid glyphs, because these are the logos their owners
-   * draw and Stash's own UI uses the same set for the same reason. The one
-   * exception is iOS: the Apple logo is already macOS's, and a phone says "phone"
-   * better than a second Apple would.
+   * draw and Stash's own UI uses the same set for the same reason.
+   *
+   * Both Apple platforms take the Apple logo, which is what they are; the name
+   * beside it is what says which of the two this entry is.
    *
    * Undefined rather than a guess, and the caller draws nothing: a name the
    * running Stash's FontAwesome does not have comes back undefined, and an
@@ -559,9 +560,8 @@ declare const __PLUGIN_VERSION__: string;
       case "windows":
         return Brands.faWindows;
       case "macos":
-        return Brands.faApple;
       case "ios":
-        return Solid.faMobileScreen;
+        return Brands.faApple;
       case "android":
         return Brands.faAndroid;
       case "linux":
