@@ -1,6 +1,6 @@
 name: External Player Launcher
 description: This plugin adds support for launching videos in external media players from scene cards and scene detail pages.
-version: 1.4.1
+version: 1.4.2
 url: https://github.com/esumaka/external-player-launcher
 
 ui:

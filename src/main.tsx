@@ -610,10 +610,16 @@ declare const __PLUGIN_VERSION__: string;
     );
   }
 
-  /** Draws one platform option: its icon, then its name */
+  /**
+   * Draws one platform option: its icon, then its name.
+   *
+   * Its own class rather than the player list's `ep-label`, because that one
+   * carries a left margin to hold it away from its checkbox — a gap that has no
+   * business in a dropdown, where the option starts at the edge of the menu.
+   */
   function formatPlatformOption(option: PlatformOption) {
     return (
-      <span className="ep-label">
+      <span className="ep-platform-option">
         {option.icon ? <Icon icon={option.icon} fixedWidth /> : null}
         <span>{option.label}</span>
       </span>
